@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>יומן רכב</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="יומן רכב">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+:root{
+  --bg:#F2F2F7; --cell:#FFFFFF; --ink:#000000; --muted:#8A8A8E; --sep:rgba(60,60,67,.2);
+  --fill:rgba(118,118,128,.12); --seg-on:#FFFFFF; --tint:#007AFF;
+  --red:#E0352B; --orange:#E07A00; --green:#248A3D; --track:#E3E3E8;
+  --sheet:#F2F2F7; --sheetcell:#FFFFFF; --bar:rgba(249,249,251,.86); --scrim:rgba(0,0,0,.32);
+  --plate:#F7CB15; --plateink:#111;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Hebrew","Segoe UI",Arial,sans-serif;
+  color-scheme:light; box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#000000; --cell:#1C1C1E; --ink:#FFFFFF; --muted:#8E8E93; --sep:rgba(84,84,88,.55);
+    --fill:rgba(118,118,128,.24); --seg-on:#636366; --tint:#0A84FF;
+    --red:#FF453A; --orange:#FF9F0A; --green:#30D158; --track:#2C2C2E;
+    --sheet:#1C1C1E; --sheetcell:#2C2C2E; --bar:rgba(22,22,24,.86); --scrim:rgba(0,0,0,.5); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#000000; --cell:#1C1C1E; --ink:#FFFFFF; --muted:#8E8E93; --sep:rgba(84,84,88,.55);
+  --fill:rgba(118,118,128,.24); --seg-on:#636366; --tint:#0A84FF;
+  --red:#FF453A; --orange:#FF9F0A; --green:#30D158; --track:#2C2C2E;
+  --sheet:#1C1C1E; --sheetcell:#2C2C2E; --bar:rgba(22,22,24,.86); --scrim:rgba(0,0,0,.5); color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.3;letter-spacing:-.2px;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+button{background:none;border:0;padding:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--tint);outline-offset:2px;border-radius:6px}
+.num{font-variant-numeric:tabular-nums;unicode-bidi:isolate;direction:ltr;display:inline-block}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.hidden{display:none!important}
+
+main{max-width:560px;margin:0 auto;padding:0 16px calc(100px + env(safe-area-inset-bottom,0px))}
+.navrow{display:flex;align-items:center;height:44px;margin:0 -8px}
+.navbtn{height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;gap:2px;color:var(--tint);font-size:17px;padding:0 8px}
+.navbtn svg.i{font-size:24px}
+.navbtn.back svg.i{font-size:22px;stroke-width:2.3}
+.navrow .sp{flex:1}
+h1{margin:0 0 14px;font-size:32px;font-weight:700;letter-spacing:.2px;line-height:1.15}
+.sub-h{color:var(--muted);font-size:15px;margin:-10px 0 16px}
+
+.seg{display:flex;background:var(--fill);border-radius:9px;padding:2px}
+.seg button{flex:1;height:30px;border-radius:7px;font-size:13px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--seg-on);font-weight:600;box-shadow:0 3px 8px rgba(0,0,0,.12),0 0 0 .5px rgba(0,0,0,.04)}
+
+.group{background:var(--cell);border-radius:10px;overflow:hidden}
+.sheet .group{background:var(--sheetcell)}
+.gap{height:22px}
+.ghdr{font-size:13px;color:var(--muted);padding:0 16px 7px;margin-top:24px}
+.ghdr:first-child{margin-top:4px}
+.foot{font-size:13px;color:var(--muted);padding:7px 16px 0;line-height:1.35}
+.row{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:0 16px;text-align:start;position:relative}
+.row + .row::before{content:"";position:absolute;top:0;left:0;right:var(--inset,16px);border-top:.5px solid var(--sep)}
+.row .lbl{flex:1}
+.row .val{color:var(--muted);text-align:end}
+.row.tall{padding-top:10px;padding-bottom:10px}
+.chev{color:var(--muted);opacity:.6;font-size:13px;display:flex}
+.chev svg.i{transform:scaleX(-1)}
+.mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.mid .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mid .s{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ic{width:30px;height:30px;border-radius:50%;background:var(--c);color:#fff;display:grid;place-items:center;flex:none}
+.ic svg.i{width:17px;height:17px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--c);flex:none}
+.st-over{--c:var(--red)} .st-soon{--c:var(--orange)} .st-ok{--c:var(--green)} .st-none{--c:var(--track)}
+.stxt.st-over{color:var(--red)} .stxt.st-soon{color:var(--orange)}
+.empty{padding:32px 20px;text-align:center;color:var(--muted);font-size:15px;line-height:1.4}
+.empty b{display:block;color:var(--ink);font-size:17px;font-weight:600;margin-bottom:4px}
+.empty .cta{margin-top:16px}
+
+/* Israeli licence plate */
+.plate{display:inline-flex;align-items:stretch;direction:ltr;background:var(--plate);color:var(--plateink);border:1.5px solid #1a1a1a;border-radius:5px;overflow:hidden;font-weight:700;line-height:1;flex:none}
+.plate .il{background:#1D4FA3;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 3px;gap:1px}
+.plate .il b{font-size:.42em;letter-spacing:.5px}
+.plate .il i{width:.62em;height:.42em;background:#fff;display:block;position:relative;border-radius:1px}
+.plate .il i::before{content:"";position:absolute;left:0;right:0;top:12%;height:12%;background:#1D4FA3;box-shadow:0 .3em 0 #1D4FA3}
+.plate .pn{padding:.18em .38em .14em;font-size:1em;letter-spacing:.04em;font-variant-numeric:tabular-nums;display:flex;align-items:center}
+.plate.sm{font-size:15px} .plate.md{font-size:20px} .plate.lg{font-size:30px}
+.plate.empty-p .pn{color:rgba(0,0,0,.45);font-weight:600}
+
+/* vehicle cards */
+.vcard{display:block;width:100%;text-align:start;background:var(--cell);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.vcard:active{opacity:.7}
+.vcard .top{display:flex;align-items:center;gap:12px}
+.vcard .nm{font-weight:600;font-size:19px}
+.vcard .meta{color:var(--muted);font-size:14px;margin-top:2px}
+.vcard .kind{width:38px;height:38px;border-radius:10px;background:var(--fill);display:grid;place-items:center;color:var(--ink);flex:none}
+.vcard .kind svg.i{width:22px;height:22px}
+.vcard .pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:14px;background:var(--fill);font-size:13px}
+.pill .dot{width:8px;height:8px}
+.vhead{display:flex;flex-direction:column;align-items:flex-start;gap:12px;margin:4px 0 6px}
+.vhead h1{margin:0}
+
+/* toolbar */
+.toolbar{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-top:.5px solid var(--sep);padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px))}
+.toolbar .in{max-width:528px;margin:0 auto;display:flex}
+.cta{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:50px;border-radius:12px;font-size:17px;font-weight:600;color:#fff;background:var(--tint)}
+.cta:active{opacity:.75}
+.cta svg.i{width:20px;height:20px;stroke-width:2.4}
+.cta.ghost{background:var(--fill);color:var(--tint)}
+
+/* sheets */
+.sheet-wrap{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.scrim{position:absolute;inset:0;background:var(--scrim);opacity:0;transition:opacity .25s}
+.sheet{position:relative;width:100%;max-width:560px;max-height:calc(100% - 12px - env(safe-area-inset-top,0px));overflow:auto;background:var(--sheet);
+  border-radius:12px 12px 0 0;padding:6px 16px calc(24px + env(safe-area-inset-bottom,0px));transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1)}
+.sheet::before{content:"";display:block;width:36px;height:5px;border-radius:3px;background:var(--fill);margin:0 auto 4px}
+.sheet-wrap.on .scrim{opacity:1} .sheet-wrap.on .sheet{transform:none}
+.sheet.alert{background:transparent;padding:0 8px calc(8px + env(safe-area-inset-bottom,0px))}
+.sheet.alert::before{display:none}
+.alert .group{background:var(--cell);margin-bottom:8px;border-radius:13px}
+.alert .head{padding:14px 16px;text-align:center;font-size:13px;color:var(--muted)}
+.alert .head b{display:block;font-size:13px;font-weight:600;margin-bottom:2px}
+.alert .head:empty{display:none}
+.alert .act{display:block;width:100%;height:56px;font-size:20px;color:var(--tint);border-top:.5px solid var(--sep)}
+.alert .head:empty + .act{border-top:0}
+.alert .act.danger{color:var(--red)} .alert .act.cancel{font-weight:600;border:0}
+.snav{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;min-height:44px;margin-bottom:8px}
+.snav .l{justify-self:start;color:var(--tint)} .snav .r{justify-self:end;color:var(--tint);font-weight:600}
+.snav .ttl{font-weight:600}
+.snav .seg{width:250px}
+
+/* form rows */
+.inp{flex:1;min-width:0;border:0;background:transparent;font-size:17px;height:44px;padding:0;outline:none;text-align:end;color:var(--muted)}
+.inp:focus{color:var(--ink)}
+.inp::placeholder{color:var(--muted);opacity:.6}
+.inp.full{text-align:start;color:var(--ink)}
+.unit{color:var(--muted);font-size:15px}
+.dateval{position:relative;color:var(--muted);display:inline-flex;align-items:center;min-height:44px}
+.dateval input{position:absolute;inset:0;opacity:0;width:100%;-webkit-appearance:none}
+.clr{color:var(--tint);font-size:15px}
+textarea.inp{height:auto;min-height:72px;padding:11px 0;resize:none;text-align:start;color:var(--ink);line-height:1.35}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px}
+.chips button{padding:7px 12px;border-radius:16px;background:var(--fill);font-size:15px}
+.chips button[aria-pressed="true"]{background:var(--tint);color:#fff}
+.lookup{color:var(--tint);font-size:15px;white-space:nowrap}
+.lookup[disabled]{opacity:.5}
+
+/* documents */
+.docs{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px}
+.doc{width:72px;height:72px;border-radius:10px;background:var(--fill) center/cover no-repeat;display:grid;place-items:center;color:var(--muted);font-size:13px;font-weight:600;position:relative}
+.doc.add{color:var(--tint)}
+.doc.add svg.i{width:26px;height:26px}
+.viewer{position:fixed;inset:0;z-index:60;background:#000;display:flex;flex-direction:column}
+.viewer .vbar{display:flex;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;color:#fff}
+.viewer .vbar button{color:#fff;font-size:17px;padding:6px}
+.viewer .vbar .danger{color:#FF453A}
+.viewer .vimg{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px)}
+.viewer img{max-width:100%;max-height:100%;object-fit:contain}
+
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translate(-50%,12px);background:rgba(30,30,32,.92);color:#fff;
+  padding:10px 16px;border-radius:12px;font-size:15px;opacity:0;transition:.2s;z-index:70;pointer-events:none;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.act{pointer-events:auto;display:flex;align-items:center;gap:16px;padding:8px 8px 8px 16px}
+.toast.act button{color:#64D2FF;font-weight:600;padding:4px 8px;font-size:15px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<main id="view"></main>
+<div class="toolbar"><div class="in"><button class="cta" id="addRec"><svg class="i" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>רישום חדש</button></div></div>
+<input type="file" id="fileJson" accept=".json,application/json" class="hidden">
+<input type="file" id="fileDoc" accept="image/*,application/pdf" multiple class="hidden">
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+'use strict';
+/* ---------- icons ---------- */
+const ICONS={
+ car:'<path d="M4 16.5v-4l2-5.2A1.8 1.8 0 0 1 7.7 6h8.6a1.8 1.8 0 0 1 1.7 1.3l2 5.2v4z"/><path d="M4 12.5h16M6.5 16.5v2M17.5 16.5v2"/><circle cx="7.5" cy="14.5" r=".9"/><circle cx="16.5" cy="14.5" r=".9"/>',
+ moto:'<circle cx="5.5" cy="16.5" r="3"/><circle cx="18.5" cy="16.5" r="3"/><path d="M8.5 16.5h4l3-6h-4.5M15.5 10.5l3 6M13 6h2.5l1.5 4.5M6 10.5h4l2.5 3"/>',
+ wrench:'<path d="M15 4.5a4 4 0 0 0-4.7 5.2L4 16a2.1 2.1 0 0 0 3 3l6.3-6.3A4 4 0 0 0 18.5 8l-2.6 2.6-2.5-.5-.5-2.5z"/>',
+ shield:'<path d="M12 3.5l7 2.5v5.5c0 4.3-3 7.7-7 9-4-1.3-7-4.7-7-9V6z"/><path d="M9 12l2 2 4-4"/>',
+ check:'<rect x="4.5" y="3.5" width="15" height="17" rx="2"/><path d="M8.5 9l2 2 4-4M8.5 15h7"/>',
+ note:'<path d="M5 4.5h10l4 4v11H5z"/><path d="M15 4.5v4h4M8.5 13h7M8.5 16.5h5"/>',
+ more:'<circle cx="12" cy="12" r="9"/><path d="M8 12h.01M12 12h.01M16 12h.01" stroke-width="2.6"/>',
+ plus:'<path d="M12 6v12M6 12h12"/>',
+ back:'<path d="M9 5l7 7-7 7"/>',
+ chev:'<path d="M9 5l7 7-7 7"/>',
+ cal:'<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
+ clip:'<path d="M20 11.5l-8.3 8.3a5 5 0 0 1-7-7L13 4.5a3.3 3.3 0 0 1 4.7 4.7l-8.3 8.3a1.7 1.7 0 0 1-2.4-2.4L14.5 7.6"/>',
+ gauge:'<path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l3.5-5"/>'
+};
+const svg=(n,x='')=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${x}>${ICONS[n]}</svg>`;
+const CHEV=`<span class="chev">${svg('chev')}</span>`;
+
+/* ---------- constants ---------- */
+const TYPES={svc:{lbl:'טיפול',icon:'wrench',color:'#2F6FDB'},ins:{lbl:'ביטוח',icon:'shield',color:'#8E5BD9'},test:{lbl:'טסט ורישיון',icon:'check',color:'#2E9E5B'},other:{lbl:'אחר',icon:'note',color:'#6E7781'}};
+const INS={mand:'ביטוח חובה',comp:'ביטוח מקיף',third:'ביטוח צד ג׳'};
+const SVC_ITEMS={car:['טיפול תקופתי','שמן ומסנן','צמיגים','בלמים','מצבר','מיזוג','מגבים','פנסים','תיקון'],moto:['טיפול תקופתי','שמן ומסנן','צמיגים','בלמים','מצבר','שרשרת וגלגלי שיניים','מצתים','תיקון']};
+const SVC_KM={car:15000,moto:6000};
+const GOV_URL='https://data.gov.il/api/3/action/datastore_search?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3';
+
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const pad=n=>String(n).padStart(2,'0');
+const ds=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const pd=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const today=()=>ds(new Date());
+const addM=(s,m)=>{const d=pd(s),day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+m);d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));return ds(d)};
+const addD=(s,n)=>{const d=pd(s);d.setDate(d.getDate()+n);return ds(d)};
+const diffD=(a,b)=>Math.round((pd(b)-pd(a))/864e5);
+const nf=new Intl.NumberFormat('he-IL',{maximumFractionDigits:2});
+const money=n=>'₪'+nf.format(Math.round(n));
+const km=n=>`${nf.format(Math.round(n))} ק״מ`;
+const fmtD=(s,o={day:'numeric',month:'short',year:'numeric'})=>pd(s).toLocaleDateString('he-IL',o);
+const num=v=>{const x=parseFloat(String(v??'').replace(/[^\d.]/g,''));return isFinite(x)?x:null};
+function fmtPlate(p){const d=String(p||'').replace(/\D/g,'');if(d.length===8)return`${d.slice(0,3)}-${d.slice(3,5)}-${d.slice(5)}`;if(d.length===7)return`${d.slice(0,2)}-${d.slice(2,5)}-${d.slice(5)}`;if(d.length===6)return`${d.slice(0,2)}-${d.slice(2,4)}-${d.slice(4)}`;return d}
+const plate=(p,size='md')=>`<span class="plate ${size}${p?'':' empty-p'}"><span class="il"><i></i><b>IL</b></span><span class="pn">${esc(p?fmtPlate(p):'ללא מספר')}</span></span>`;
+
+/* ---------- storage ---------- */
+let S=null;
+const idb={db:null,
+  open(){return new Promise((res,rej)=>{const r=indexedDB.open('yoman-rechev',1);r.onupgradeneeded=()=>{r.result.createObjectStore('kv');r.result.createObjectStore('docs')};r.onsuccess=()=>{this.db=r.result;res()};r.onerror=()=>rej(r.error)})},
+  req(store,mode,fn){return new Promise((res,rej)=>{const tx=this.db.transaction(store,mode),q=fn(tx.objectStore(store));tx.oncomplete=()=>res(q&&q.result);tx.onerror=()=>rej(tx.error)})},
+  get(s,k){return this.req(s,'readonly',o=>o.get(k))},
+  set(s,k,v){return this.req(s,'readwrite',o=>o.put(v,k))},
+  del(s,k){return this.req(s,'readwrite',o=>o.delete(k))},
+  keys(s){return this.req(s,'readonly',o=>o.getAllKeys())},
+  clear(s){return this.req(s,'readwrite',o=>o.clear())}
+};
+const fresh=()=>({v:1,vehicles:[],recs:[],meta:{}});
+async function load(){
+  try{await idb.open();S=await idb.get('kv','state')}catch(e){idb.db=null}
+  if(!S||!Array.isArray(S.vehicles))S=fresh();
+  try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(_){}
+  gcDocs();
+}
+let saveT;
+function save(){clearTimeout(saveT);saveT=setTimeout(persist,120)}
+async function persist(){clearTimeout(saveT);try{if(idb.db)await idb.set('kv','state',S)}catch(e){toast('השמירה נכשלה: '+e.message)}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')persist()});
+async function gcDocs(){ // remove photos no record points to (runs at launch, so undo still works during a session)
+  if(!idb.db)return;try{const used=new Set(S.recs.flatMap(r=>r.docs||[]));for(const k of await idb.keys('docs'))if(!used.has(k))await idb.del('docs',k)}catch(_){}
+}
+const vById=id=>S.vehicles.find(v=>v.id===id);
+
+/* ---------- due dates ---------- */
+function tracks(v){
+  const recs=S.recs.filter(r=>r.vid===v.id),out=[];
+  const latest=(l,key)=>l.reduce((a,r)=>!a||(r[key]||'')>(a[key]||'')?r:a,null);
+  for(const sub of['mand','comp','third']){
+    const r=latest(recs.filter(r=>r.type==='ins'&&r.sub===sub),'end');
+    if(r)out.push({k:'ins-'+sub,type:'ins',sub,title:INS[sub],due:r.end,rec:r});
+  }
+  if(!out.some(t=>t.sub==='mand'))out.unshift({k:'ins-mand',type:'ins',sub:'mand',title:INS.mand,missing:true});
+  if(!out.some(t=>t.sub==='comp'||t.sub==='third'))out.push({k:'ins-comp',type:'ins',sub:'comp',title:'ביטוח מקיף או צד ג׳',missing:true});
+  const t=latest(recs.filter(r=>r.type==='test'),'date');
+  out.push(t?{k:'test',type:'test',title:'טסט ורישיון',due:t.next,rec:t}:{k:'test',type:'test',title:'טסט ורישיון',missing:true});
+  const sv=latest(recs.filter(r=>r.type==='svc'),'date');
+  out.push(sv?{k:'svc',type:'svc',title:'טיפול הבא',due:sv.nextDate,dueKm:sv.nextKm,rec:sv}:{k:'svc',type:'svc',title:'טיפול הבא',missing:true});
+  const others=new Map();
+  for(const r of recs)if(r.type==='other'&&r.next){const key=(r.title||'').trim();const o=others.get(key);if(!o||r.date>o.date)others.set(key,r)}
+  for(const[key,r]of others)out.push({k:'other-'+key,type:'other',title:key||'תזכורת',due:r.next,rec:r});
+  for(const x of out)Object.assign(x,status(x,v));
+  return out;
+}
+function status(t,v){
+  if(t.missing)return{st:'none',text:'לא הוזן'};
+  const days=t.due?diffD(today(),t.due):null,kl=t.dueKm&&v.km?t.dueKm-v.km:null;
+  if(days===null&&kl===null)return{st:'none',text:'ללא מועד'};
+  const over=(days!==null&&days<0)||(kl!==null&&kl<=0),soon=(days!==null&&days<=30)||(kl!==null&&kl<=1000);
+  const isExp=t.type==='ins'||t.type==='test';
+  let text;
+  if(over){text=days!==null&&days<0?(isExp?`פג לפני ${-days===1?'יום':-days+' ימים'}`:`באיחור של ${-days===1?'יום':-days+' ימים'}`):`עברת את המועד ב-${km(-kl)}`}
+  else{const p=[];
+    if(days!==null)p.push(days===0?'היום':days===1?'מחר':days<=45?`בעוד ${days} ימים`:(isExp?`בתוקף עד ${fmtD(t.due)}`:fmtD(t.due)));
+    if(kl!==null)p.push(`בעוד ${km(kl)}`);
+    text=p.join(' או ')}
+  return{st:over?'over':soon?'soon':'ok',text,days,kl};
+}
+function allDue(){
+  const out=[];for(const v of S.vehicles)for(const t of tracks(v))if(!t.missing&&t.st!=='none')out.push({...t,v});
+  const rank={over:0,soon:1,ok:2};
+  return out.sort((a,b)=>rank[a.st]-rank[b.st]||(a.days??9e9)-(b.days??9e9));
+}
+
+/* ---------- UI shell ---------- */
+const UI={view:'home',vid:null};
+function go(view,vid=null){UI.view=view;UI.vid=vid;render();window.scrollTo(0,0)}
+function render(){
+  if(UI.view==='veh'&&vById(UI.vid))renderVehicle(vById(UI.vid));else{UI.view='home';renderHome()}
+}
+function recTitle(r){
+  if(r.type==='ins')return`${INS[r.sub]||'ביטוח'}${r.company?', '+r.company:''}`;
+  if(r.type==='test')return'טסט וחידוש רישיון';
+  if(r.type==='svc')return r.items&&r.items.length?r.items.join(', '):'טיפול';
+  return r.title||'אחר';
+}
+function recDate(r){return r.type==='ins'?r.start:r.date}
+
+function renderHome(){
+  const el=$('#view'),due=allDue(),y=String(new Date().getFullYear());
+  let h=`<div class="navrow"><button class="navbtn" id="menuBtn" aria-label="תפריט">${svg('more')}</button><span class="sp"></span><button class="navbtn" id="addVeh" aria-label="הוספת רכב">${svg('plus')}</button></div><h1>יומן רכב</h1>`;
+  if(!S.vehicles.length){
+    h+=`<div class="group"><div class="empty"><b>עוד לא הוספת רכב</b>מוסיפים את הרכב והאופנוע, ואז רושמים ביטוחים, טסטים וטיפולים. האפליקציה תראה מה מתקרב.<button class="cta" id="firstVeh">הוספת רכב</button></div></div>`;
+    el.innerHTML=h;$('#firstVeh').onclick=()=>editVehicle(null);
+  }else{
+    for(const v of S.vehicles){
+      const ts=tracks(v).filter(t=>!t.missing||t.k==='ins-mand'||t.k==='test');
+      h+=`<button class="vcard" data-v="${v.id}"><span class="top"><span class="kind">${svg(v.kind==='moto'?'moto':'car')}</span><span class="mid"><span class="nm">${esc(v.name||'רכב')}</span><span class="meta">${esc([v.make,v.model,v.year].filter(Boolean).join(' '))}${v.km?(v.make||v.model?', ':'')+km(v.km):''}</span></span>${plate(v.plate,'sm')}</span>
+        <span class="pills">${ts.map(t=>`<span class="pill"><span class="dot st-${t.st}"></span>${esc(t.type==='svc'?'טיפול':t.title)}${t.st==='over'||t.st==='soon'||t.missing?': '+esc(t.text):''}</span>`).join('')}</span></button>`;
+    }
+    const near=due.filter(d=>d.st!=='ok'||(d.days!==null&&d.days<=90));
+    h+=`<div class="ghdr">מה מחכה</div>`;
+    h+=near.length?`<div class="group">${near.map(d=>`<button class="row tall" data-due="${d.v.id}|${esc(d.k)}" style="--inset:42px"><span class="dot st-${d.st}"></span><span class="mid"><span class="t">${esc(d.title)}, ${esc(d.v.name||'')}</span><span class="s stxt st-${d.st}">${esc(d.text)}</span></span>${CHEV}</button>`).join('')}</div>`
+      :`<div class="group"><div class="row"><span class="dot st-ok"></span><span class="lbl">אין מועדים ב-90 הימים הקרובים</span></div></div>`;
+    const tot=S.vehicles.map(v=>[v,S.recs.filter(r=>r.vid===v.id&&(recDate(r)||'').startsWith(y)).reduce((a,r)=>a+(r.cost||0),0)]);
+    if(tot.some(x=>x[1]))h+=`<div class="ghdr">הוצאות ${y}</div><div class="group">${tot.map(([v,c])=>`<div class="row"><span class="lbl">${esc(v.name||'רכב')}</span><span class="num val">${money(c)}</span></div>`).join('')}
+      ${tot.length>1?`<div class="row"><span class="lbl" style="font-weight:600">סה״כ</span><span class="num">${money(tot.reduce((a,x)=>a+x[1],0))}</span></div>`:''}</div>`;
+    el.innerHTML=h;
+    el.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>go('veh',b.dataset.v));
+    el.querySelectorAll('[data-due]').forEach(b=>b.onclick=()=>{const[vid,k]=b.dataset.due.split('|');const v=vById(vid);const t=tracks(v).find(x=>x.k===k);if(t)trackAction(v,t)});
+  }
+  $('#menuBtn').onclick=openMenu;$('#addVeh').onclick=()=>editVehicle(null);
+}
+
+function renderVehicle(v){
+  const el=$('#view'),ts=tracks(v),recs=S.recs.filter(r=>r.vid===v.id).sort((a,b)=>(recDate(b)||'').localeCompare(recDate(a)||''));
+  const byYear=new Map();for(const r of recs){const y=(recDate(r)||'').slice(0,4);if(!y)continue;const o=byYear.get(y)||{t:0,svc:0,ins:0,test:0,other:0};o.t+=r.cost||0;o[r.type]+=r.cost||0;byYear.set(y,o)}
+  const years=[...byYear.keys()].sort().reverse();
+  let h=`<div class="navrow"><button class="navbtn back" id="back">${svg('back')}יומן רכב</button><span class="sp"></span><button class="navbtn" id="editV">עריכה</button></div>
+    <div class="vhead">${plate(v.plate,'lg')}<h1>${esc(v.name||'רכב')}</h1></div>
+    <div class="sub-h">${esc([v.make,v.model,v.year,v.color].filter(Boolean).join(', '))}</div>
+    <div class="group"><button class="row" id="kmRow"><span class="lbl">קילומטראז׳</span><span class="val">${v.km?`<span class="num">${km(v.km)}</span>`:'לא הוזן'}</span>${CHEV}</button></div>
+    ${v.km&&v.kmDate?`<div class="foot">עודכן ב-${fmtD(v.kmDate)}</div>`:''}
+    <div class="ghdr">מועדים</div>
+    <div class="group">${ts.map(t=>`<button class="row tall" data-t="${esc(t.k)}" style="--inset:42px"><span class="dot st-${t.st}"></span><span class="mid"><span class="t">${esc(t.title)}</span><span class="s stxt st-${t.st}">${esc(t.text)}</span></span>${CHEV}</button>`).join('')}</div>`;
+  if(years.length){
+    const y=years[0],o=byYear.get(y);
+    h+=`<div class="ghdr">הוצאות</div><div class="group">${years.map(y=>{const o=byYear.get(y);const parts=['ins','svc','test','other'].filter(k=>o[k]).map(k=>`${k==='ins'?'ביטוח':k==='svc'?'טיפולים':k==='test'?'טסט':'אחר'} ${money(o[k])}`).join(', ');return`<div class="row tall"><span class="mid"><span class="t">${y}</span><span class="s">${esc(parts)}</span></span><span class="num">${money(o.t)}</span></div>`}).join('')}</div>`;
+  }
+  h+=`<div class="ghdr">היסטוריה</div>`;
+  h+=recs.length?`<div class="group">${recs.map(r=>{const T=TYPES[r.type];const sub=[recDate(r)?fmtD(recDate(r)):'',r.km?km(r.km):'',r.garage||''].filter(Boolean).join(', ');
+      return`<button class="row tall" data-r="${r.id}" style="--inset:58px"><span class="ic" style="--c:${T.color}">${svg(T.icon)}</span><span class="mid"><span class="t">${esc(recTitle(r))}</span><span class="s">${esc(sub)}${r.docs&&r.docs.length?' '+svg('clip','style="width:12px;height:12px;vertical-align:-1px"'):''}</span></span>${r.cost?`<span class="num val">${money(r.cost)}</span>`:''}${CHEV}</button>`}).join('')}</div>`
+    :`<div class="group"><div class="empty">עוד אין רישומים לרכב הזה</div></div>`;
+  el.innerHTML=h;
+  $('#back').onclick=()=>go('home');
+  $('#editV').onclick=()=>editVehicle(v);
+  $('#kmRow').onclick=()=>editKm(v);
+  el.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{const t=ts.find(x=>x.k===b.dataset.t);if(t)trackAction(v,t)});
+  el.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const r=S.recs.find(x=>x.id===b.dataset.r);if(r)editRecord({rec:r})});
+}
+
+async function trackAction(v,t){
+  if(t.missing){editRecord({vid:v.id,type:t.type,sub:t.sub});return}
+  const acts=[{label:t.type==='ins'?'חידוש הביטוח':t.type==='test'?'רישום טסט חדש':t.type==='svc'?'רישום טיפול':'רישום חדש',val:'new'}];
+  if(t.due)acts.push({label:'הוספת תזכורת ליומן',val:'cal'});
+  acts.push({label:'צפייה ברישום האחרון',val:'view'},{label:'ביטול',val:null});
+  const a=await ask(`${t.title}: ${v.name||''}`,t.text,acts);
+  if(a==='new')editRecord({vid:v.id,type:t.type,sub:t.sub,from:t.rec});
+  else if(a==='view')editRecord({rec:t.rec});
+  else if(a==='cal')addToCalendar(v,t);
+}
+
+/* ---------- sheets / alerts / toast ---------- */
+function sheet(html,cls=''){
+  const w=document.createElement('div');w.className='sheet-wrap';
+  w.innerHTML=`<div class="scrim"></div><div class="sheet ${cls}" role="dialog" aria-modal="true">${html}</div>`;
+  document.body.appendChild(w);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>w.classList.add('on')));
+  let closed=false;
+  const api={el:w.querySelector('.sheet'),onclose:null,close(){if(closed)return;closed=true;w.classList.remove('on');setTimeout(()=>w.remove(),300);api.onclose&&api.onclose()}};
+  w.querySelector('.scrim').onclick=api.close;
+  return api;
+}
+function ask(title,msg,buttons){
+  return new Promise(res=>{
+    const acts=buttons.filter(b=>b.val!==false&&b.val!==null),cancel=buttons.find(b=>b.val===false||b.val===null);
+    const s=sheet(`<div class="group"><div class="head">${title||msg?`<b>${esc(title)}</b>${esc(msg||'')}`:''}</div>${acts.map((b,i)=>`<button class="act ${b.cls||''}" data-i="${i}">${esc(b.label)}</button>`).join('')}</div>
+      <div class="group"><button class="act cancel" data-c>${esc(cancel?cancel.label:'ביטול')}</button></div>`,'alert');
+    let val=cancel?cancel.val:null;s.onclose=()=>res(val);
+    s.el.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{val=acts[+b.dataset.i].val;s.close()});
+    s.el.querySelector('[data-c]').onclick=s.close;
+  });
+}
+let toastT;
+function toast(msg,action){
+  const t=$('#toast');t.innerHTML=`<span>${esc(msg)}</span>${action?`<button>${esc(action.label)}</button>`:''}`;
+  t.classList.toggle('act',!!action);t.classList.add('on');
+  if(action)t.querySelector('button').onclick=()=>{t.classList.remove('on','act');clearTimeout(toastT);action.fn()};
+  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on','act'),action?5000:2400);
+}
+const undo=fn=>({label:'ביטול',fn});
+
+/* ---------- vehicle ---------- */
+function editVehicle(orig){
+  const v=orig?{...orig}:{id:uid(),kind:'car',name:'',make:'',model:'',year:'',color:'',plate:'',km:null,kmDate:null};
+  let found=null;
+  const s=sheet(`<div class="snav"><button class="l" data-close>ביטול</button><span class="ttl">${orig?'עריכת רכב':'רכב חדש'}</span><button class="r" id="vSave">שמירה</button></div>
+    <nav class="seg" id="vKind"><button data-k="car">רכב</button><button data-k="moto">אופנוע</button></nav>
+    <div class="gap" style="height:14px"></div>
+    <div class="group">
+      <div class="row"><span class="lbl">כינוי</span><input class="inp" id="vName" placeholder="למשל: האוטו" maxlength="30"></div>
+      <div class="row"><span class="lbl">מספר רישוי</span><input class="inp" id="vPlate" inputmode="numeric" placeholder="1234567" maxlength="10"><button class="lookup" id="vLook">מילוי פרטים</button></div>
+    </div>
+    <div class="foot" id="vLookMsg">מילוי פרטים מושך יצרן, דגם, שנה ותוקף רישיון ממאגר משרד התחבורה ב-data.gov.il. נשלח רק מספר הרישוי.</div>
+    <div class="gap" style="height:14px"></div>
+    <div class="group">
+      <div class="row"><span class="lbl">יצרן</span><input class="inp" id="vMake" maxlength="40"></div>
+      <div class="row"><span class="lbl">דגם</span><input class="inp" id="vModel" maxlength="40"></div>
+      <div class="row"><span class="lbl">שנה</span><input class="inp" id="vYear" inputmode="numeric" maxlength="4"></div>
+      <div class="row"><span class="lbl">צבע</span><input class="inp" id="vColor" maxlength="30"></div>
+      <div class="row"><span class="lbl">קילומטראז׳</span><input class="inp" id="vKm" inputmode="numeric"><span class="unit">ק״מ</span></div>
+    </div>
+    ${orig?`<div class="gap"></div><div class="group"><button class="row" id="vDel"><span style="color:var(--red)">מחיקת הרכב וכל הרישומים שלו</span></button></div>`:''}`);
+  const el=s.el,f=id=>el.querySelector(id);
+  f('#vName').value=v.name;f('#vPlate').value=v.plate;f('#vMake').value=v.make;f('#vModel').value=v.model;f('#vYear').value=v.year;f('#vColor').value=v.color;f('#vKm').value=v.km??'';
+  const paintKind=()=>el.querySelectorAll('#vKind button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===v.kind));
+  paintKind();
+  el.querySelectorAll('#vKind button').forEach(b=>b.onclick=()=>{v.kind=b.dataset.k;paintKind()});
+  el.querySelector('[data-close]').onclick=s.close;
+  f('#vLook').onclick=async()=>{
+    const p=f('#vPlate').value.replace(/\D/g,'');if(p.length<5){f('#vPlate').focus();return}
+    const b=f('#vLook'),msg=f('#vLookMsg');b.disabled=true;b.textContent='מחפש…';
+    try{
+      const r=await fetch(`${GOV_URL}&filters=${encodeURIComponent(JSON.stringify({mispar_rechev:+p}))}&limit=1`);
+      const j=await r.json();const x=j&&j.result&&j.result.records&&j.result.records[0];
+      if(!x){msg.textContent=v.kind==='moto'?'המספר לא נמצא במאגר. המאגר הזה כולל רכב פרטי ומסחרי, ולכן אופנועים ממלאים ידנית.':'המספר לא נמצא במאגר. אפשר למלא את הפרטים ידנית.'}
+      else{
+        const cl=s=>String(s??'').trim();
+        f('#vMake').value=cl(x.tozeret_nm);f('#vModel').value=cl(x.kinuy_mishari||x.degem_nm);f('#vYear').value=cl(x.shnat_yitzur);f('#vColor').value=cl(x.tzeva_rechev);
+        if(!f('#vName').value)f('#vName').value=cl(x.kinuy_mishari)||cl(x.tozeret_nm);
+        const tk=cl(x.tokef_dt).slice(0,10),last=cl(x.mivchan_acharon_dt).slice(0,10);
+        found=/^\d{4}-\d\d-\d\d$/.test(tk)?{tokef:tk,last:/^\d{4}-\d\d-\d\d$/.test(last)?last:null}:null;
+        msg.textContent=found?`נמצא. תוקף הרישיון עד ${fmtD(found.tokef)}. הוא יירשם אוטומטית כמועד הטסט הבא.`:'נמצא, והפרטים מולאו.';
+      }
+    }catch(e){msg.textContent='לא הצלחתי להתחבר למאגר. בדוק את החיבור לאינטרנט, או מלא את הפרטים ידנית.'}
+    b.disabled=false;b.textContent='מילוי פרטים';
+  };
+  f('#vSave').onclick=()=>{
+    v.name=f('#vName').value.trim();v.plate=f('#vPlate').value.replace(/\D/g,'');v.make=f('#vMake').value.trim();v.model=f('#vModel').value.trim();
+    v.year=f('#vYear').value.replace(/\D/g,'');v.color=f('#vColor').value.trim();
+    const k=num(f('#vKm').value);if(k!==(orig?orig.km:null)){v.km=k;v.kmDate=k?today():null}
+    if(!v.name)v.name=v.model||v.make||(v.kind==='moto'?'האופנוע':'האוטו');
+    if(orig)Object.assign(orig,v);else S.vehicles.push(v);
+    if(found&&!S.recs.some(r=>r.vid===v.id&&r.type==='test'&&r.next===found.tokef))
+      S.recs.push({id:uid(),vid:v.id,type:'test',date:found.last||addM(found.tokef,-12),next:found.tokef,cost:null,note:'מתוך מאגר משרד התחבורה',docs:[]});
+    save();s.close();go('veh',v.id);toast(orig?'הרכב עודכן':'הרכב נוסף');
+  };
+  const del=f('#vDel');
+  if(del)del.onclick=async()=>{
+    const n=S.recs.filter(r=>r.vid===orig.id).length;
+    const ok=await ask(`למחוק את ${orig.name}?`,`${n} רישומים יימחקו יחד איתו.`,[{label:'מחיקה',val:true,cls:'danger'},{label:'ביטול',val:false}]);
+    if(!ok)return;
+    const vi=S.vehicles.indexOf(orig),rs=S.recs.filter(r=>r.vid===orig.id);
+    S.vehicles.splice(vi,1);S.recs=S.recs.filter(r=>r.vid!==orig.id);save();s.close();go('home');
+    toast(`${orig.name} נמחק`,undo(()=>{S.vehicles.splice(vi,0,orig);S.recs.push(...rs);save();render()}));
+  };
+}
+function editKm(v){
+  const s=sheet(`<div class="snav"><button class="l" data-close>ביטול</button><span class="ttl">קילומטראז׳</span><button class="r" id="kSave">שמירה</button></div>
+    <div class="group"><div class="row"><span class="lbl">מד אוץ עכשיו</span><input class="inp" id="kVal" inputmode="numeric" style="color:var(--ink)"><span class="unit">ק״מ</span></div></div>
+    <div class="foot">${v.km?`הערך הקודם: ${km(v.km)}${v.kmDate?`, מ-${fmtD(v.kmDate)}`:''}.`:''} הקילומטראז׳ משמש לחישוב מתי מגיע הטיפול הבא.</div>`);
+  const i=s.el.querySelector('#kVal');i.value=v.km??'';setTimeout(()=>i.focus(),320);
+  s.el.querySelector('[data-close]').onclick=s.close;
+  s.el.querySelector('#kSave').onclick=()=>{const k=num(i.value);if(k===null){i.focus();return}
+    if(v.km&&k<v.km){toast('הערך קטן מהקודם. אם זו טעות, תקן אותו');}
+    v.km=k;v.kmDate=today();save();s.close();render()};
+}
+
+/* ---------- record editor ---------- */
+async function pickVehicle(){
+  if(S.vehicles.length===1)return S.vehicles[0].id;
+  return ask('לאיזה רכב?','',[...S.vehicles.map(v=>({label:v.name||fmtPlate(v.plate),val:v.id})),{label:'ביטול',val:null}]);
+}
+function editRecord({rec=null,vid=null,type='svc',sub='mand',from=null}={}){
+  const orig=rec;
+  const v0=vById(rec?rec.vid:vid);if(!v0)return;
+  const r=rec?JSON.parse(JSON.stringify(rec)):{id:uid(),vid:v0.id,type,docs:[]};
+  if(!rec){
+    if(type==='ins'){r.sub=sub;r.start=from&&from.end&&from.end>=addD(today(),-60)?addD(from.end,1):today();r.end=addD(addM(r.start,12),-1);r.company=from?.company||'';r.cost=null}
+    else if(type==='test'){r.date=today();r.next=addM(today(),12)}
+    else if(type==='svc'){r.date=today();r.km=v0.km||null;r.items=[];r.garage=from?.garage||lastGarage(v0.id)}
+    else{r.date=today();r.title=from?.title||''}
+  }
+  const s=sheet(`<div class="snav"><button class="l" data-close>ביטול</button>
+      <nav class="seg" id="rType">${Object.entries(TYPES).map(([k,t])=>`<button data-t="${k}">${k==='test'?'טסט':t.lbl}</button>`).join('')}</nav>
+      <button class="r" id="rSave">שמירה</button></div>
+    <div id="rForm"></div>`);
+  const el=s.el;
+  const vrow=()=>S.vehicles.length>1?`<button class="row" id="fVeh"><span class="lbl">רכב</span><span class="val">${esc(vById(r.vid).name)}</span>${CHEV}</button>`:'';
+  const dateRow=(key,label,optional)=>`<label class="row"><span class="lbl">${label}</span><span class="dateval"><span data-dl="${key}">${r[key]?fmtD(r[key]):optional?'ללא':'בחירה'}</span><input type="date" data-d="${key}" value="${r[key]||''}"></span>${optional&&r[key]?`<button class="clr" data-clr="${key}" type="button">ניקוי</button>`:''}</label>`;
+  const numRow=(key,label,unit,ph='')=>`<div class="row"><span class="lbl">${label}</span><input class="inp" data-n="${key}" inputmode="decimal" placeholder="${ph}" value="${r[key]??''}">${unit?`<span class="unit">${unit}</span>`:''}</div>`;
+  const txtRow=(key,label,ph='',list='')=>`<div class="row"><span class="lbl">${label}</span><input class="inp" data-s="${key}" placeholder="${ph}" value="${esc(r[key]||'')}" ${list?`list="${list}"`:''} maxlength="60"></div>`;
+  const dl=(id,vals)=>`<datalist id="${id}">${[...new Set(vals.filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`;
+  const docsBlock=()=>`<div class="ghdr">מסמכים ותמונות</div><div class="group"><div class="docs" id="fDocs"></div></div>`;
+  const noteBlock=()=>`<div class="gap" style="height:14px"></div><div class="group"><div class="row"><textarea class="inp" data-s="note" placeholder="הערות" maxlength="500">${esc(r.note||'')}</textarea></div></div>`;
+  const delBlock=()=>orig?`<div class="gap"></div><div class="group"><button class="row" id="fDel"><span style="color:var(--red)">מחיקת הרישום</span></button></div>`:'';
+  function form(){
+    const v=vById(r.vid);let h='';
+    if(r.type==='ins'){
+      h+=`<nav class="seg" id="fSub"><button data-s="mand">חובה</button><button data-s="comp">מקיף</button><button data-s="third">צד ג׳</button></nav><div class="gap" style="height:14px"></div>
+        <div class="group">${vrow()}${txtRow('company','חברה','','companies')}${txtRow('policy','מספר פוליסה')}${dateRow('start','תחילת ביטוח')}${dateRow('end','סוף ביטוח')}${numRow('cost','עלות','₪')}</div>
+        ${dl('companies',S.recs.filter(x=>x.type==='ins').map(x=>x.company))}
+        <div class="foot">סוף הביטוח הוא המועד שיופיע במסך הראשי.</div>`;
+    }else if(r.type==='test'){
+      h+=`<div class="group">${vrow()}${dateRow('date','תאריך הטסט')}${dateRow('next','רישיון בתוקף עד')}${numRow('cost','עלות טסט ואגרה','₪')}</div>`;
+    }else if(r.type==='svc'){
+      const items=SVC_ITEMS[v.kind]||SVC_ITEMS.car;
+      h+=`<div class="group">${vrow()}${dateRow('date','תאריך')}${numRow('km','קילומטראז׳','ק״מ')}${txtRow('garage','מוסך','','garages')}${numRow('cost','עלות','₪')}</div>
+        ${dl('garages',S.recs.map(x=>x.garage))}
+        <div class="ghdr">מה נעשה</div><div class="group"><div class="chips" id="fItems">${[...new Set([...items,...(r.items||[])])].map(x=>`<button data-it="${esc(x)}" aria-pressed="${(r.items||[]).includes(x)}">${esc(x)}</button>`).join('')}</div></div>
+        <div class="ghdr">הטיפול הבא</div><div class="group">${dateRow('nextDate','תאריך',true)}${numRow('nextKm','קילומטראז׳','ק״מ',r.km?String(r.km+SVC_KM[v.kind]):'')}</div>
+        <div class="foot">אפשר למלא תאריך, קילומטראז׳ או שניהם. המוקדם מביניהם יקבע מתי הטיפול מתקרב.${!r.nextDate&&!r.nextKm?` <button class="clr" id="fSugg" type="button">הצעה: בעוד שנה או ${km(SVC_KM[v.kind])}</button>`:''}</div>`;
+    }else{
+      h+=`<div class="group">${vrow()}${txtRow('title','מה','למשל: החלפת צמיגים','titles')}${dateRow('date','תאריך')}${numRow('km','קילומטראז׳','ק״מ')}${numRow('cost','עלות','₪')}${dateRow('next','תזכורת לפעם הבאה',true)}</div>
+        ${dl('titles',S.recs.filter(x=>x.type==='other').map(x=>x.title))}`;
+    }
+    h+=noteBlock()+docsBlock()+delBlock();
+    el.querySelector('#rForm').innerHTML=h;
+    el.querySelectorAll('#rType button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===r.type));
+    el.querySelectorAll('#fSub button').forEach(b=>{b.setAttribute('aria-pressed',b.dataset.s===r.sub);b.onclick=()=>{collect();r.sub=b.dataset.s;form()}});
+    el.querySelectorAll('[data-d]').forEach(i=>i.onchange=()=>{collect();const k=i.dataset.d;r[k]=i.value||null;
+      if(k==='start'&&r.type==='ins'&&r.start)r.end=addD(addM(r.start,12),-1);
+      if(k==='date'&&r.type==='test'&&r.date&&!orig)r.next=addM(r.date,12);
+      form()});
+    el.querySelectorAll('[data-clr]').forEach(b=>b.onclick=e=>{e.preventDefault();collect();r[b.dataset.clr]=null;form()});
+    el.querySelectorAll('[data-it]').forEach(b=>b.onclick=()=>{const x=b.dataset.it;r.items=r.items||[];const i=r.items.indexOf(x);if(i<0)r.items.push(x);else r.items.splice(i,1);b.setAttribute('aria-pressed',i<0)});
+    const sg=el.querySelector('#fSugg');if(sg)sg.onclick=()=>{collect();r.nextDate=addM(r.date||today(),12);r.nextKm=r.km?r.km+SVC_KM[v.kind]:null;form()};
+    const fv=el.querySelector('#fVeh');if(fv)fv.onclick=async()=>{collect();const id=await ask('לאיזה רכב?','',[...S.vehicles.map(x=>({label:x.name,val:x.id})),{label:'ביטול',val:null}]);if(id){r.vid=id;form()}};
+    renderDocs();
+    const d=el.querySelector('#fDel');if(d)d.onclick=()=>{
+      const i=S.recs.indexOf(orig);S.recs.splice(i,1);save();s.close();render();
+      toast('הרישום נמחק',undo(()=>{S.recs.splice(i,0,orig);save();render()}));
+    };
+  }
+  function collect(){
+    el.querySelectorAll('[data-n]').forEach(i=>r[i.dataset.n]=num(i.value));
+    el.querySelectorAll('[data-s]').forEach(i=>{if(i.tagName!=='BUTTON')r[i.dataset.s]=i.value.trim()});
+  }
+  async function renderDocs(){
+    const box=el.querySelector('#fDocs');if(!box)return;
+    box.innerHTML=(r.docs||[]).map(id=>`<button class="doc" data-doc="${id}"></button>`).join('')+`<button class="doc add" id="fAddDoc" aria-label="הוספת תמונה או מסמך">${svg('plus')}</button>`;
+    box.querySelector('#fAddDoc').onclick=()=>{collect();pickDocs(ids=>{r.docs=[...(r.docs||[]),...ids];renderDocs()})};
+    for(const b of box.querySelectorAll('[data-doc]')){
+      const blob=await idb.get('docs',b.dataset.doc).catch(()=>null);
+      if(!blob){b.textContent='?';continue}
+      if(blob.type.startsWith('image/'))b.style.backgroundImage=`url(${URL.createObjectURL(blob)})`;else b.textContent='PDF';
+      b.onclick=()=>viewDoc(b.dataset.doc,blob,()=>{r.docs=r.docs.filter(x=>x!==b.dataset.doc);renderDocs()});
+    }
+  }
+  el.querySelectorAll('#rType button').forEach(b=>b.onclick=()=>{
+    collect();const t=b.dataset.t;if(t===r.type)return;r.type=t;
+    if(t==='ins'){r.sub=r.sub||'mand';r.start=r.start||r.date||today();r.end=r.end||addD(addM(r.start,12),-1)}
+    if(t==='test'){r.date=r.date||r.start||today();r.next=r.next||addM(r.date,12)}
+    if(t==='svc'){r.date=r.date||r.start||today();r.items=r.items||[]}
+    if(t==='other'){r.date=r.date||r.start||today()}
+    form()});
+  el.querySelector('[data-close]').onclick=s.close;
+  el.querySelector('#rSave').onclick=()=>{
+    collect();
+    const clean={id:r.id,vid:r.vid,type:r.type,cost:r.cost??null,note:r.note||'',docs:r.docs||[]};
+    if(r.type==='ins'){if(!r.start||!r.end){toast('צריך תאריך התחלה וסוף');return}if(r.end<r.start){toast('סוף הביטוח לפני תחילתו');return}Object.assign(clean,{sub:r.sub,company:r.company||'',policy:r.policy||'',start:r.start,end:r.end})}
+    else if(r.type==='test'){if(!r.date){toast('צריך תאריך');return}Object.assign(clean,{date:r.date,next:r.next||null})}
+    else if(r.type==='svc'){if(!r.date){toast('צריך תאריך');return}Object.assign(clean,{date:r.date,km:r.km??null,garage:r.garage||'',items:r.items||[],nextDate:r.nextDate||null,nextKm:r.nextKm??null})}
+    else{if(!r.title){toast('מה נעשה? למשל: החלפת צמיגים');el.querySelector('[data-s="title"]').focus();return}if(!r.date){toast('צריך תאריך');return}Object.assign(clean,{title:r.title,date:r.date,km:r.km??null,next:r.next||null})}
+    if(orig){for(const k of Object.keys(orig))delete orig[k];Object.assign(orig,clean)}else S.recs.push(clean);
+    const v=vById(clean.vid);
+    if(clean.km&&(!v.km||clean.km>v.km)){v.km=clean.km;v.kmDate=clean.date||today()}
+    save();s.close();
+    if(UI.view!=='veh'||UI.vid!==clean.vid)go('veh',clean.vid);else render();
+    toast(orig?'הרישום עודכן':'נשמר');
+  };
+  form();
+}
+function lastGarage(vid){const l=S.recs.filter(r=>r.vid===vid&&r.type==='svc'&&r.garage).sort((a,b)=>b.date.localeCompare(a.date));return l[0]?l[0].garage:''}
+
+/* ---------- documents ---------- */
+let docCb=null;
+function pickDocs(cb){docCb=cb;$('#fileDoc').click()}
+async function compress(file){
+  if(!file.type.startsWith('image/'))return file;
+  try{
+    const bmp=await createImageBitmap(file,{imageOrientation:'from-image'});
+    const k=Math.min(1,1800/Math.max(bmp.width,bmp.height)),c=document.createElement('canvas');
+    c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+    return await new Promise(res=>c.toBlob(b=>res(b||file),'image/jpeg',.82));
+  }catch(_){return file}
+}
+async function onDocFiles(files){
+  const ids=[];
+  for(const f of files){
+    if(f.size>25e6){toast('הקובץ גדול מדי');continue}
+    const b=await compress(f),id=uid();
+    try{await idb.set('docs',id,b);ids.push(id)}catch(e){toast('לא הצלחתי לשמור את הקובץ')}
+  }
+  if(ids.length&&docCb)docCb(ids);
+}
+function viewDoc(id,blob,onRemove){
+  const url=URL.createObjectURL(blob);
+  if(!blob.type.startsWith('image/')){
+    ask('מסמך PDF','',[{label:'פתיחה',val:'open'},{label:'שיתוף או שמירה',val:'share'},{label:'הסרה מהרישום',val:'del',cls:'danger'},{label:'ביטול',val:null}]).then(a=>{
+      if(a==='open')window.open(url,'_blank');
+      else if(a==='share')shareBlob(blob,'מסמך.pdf');
+      else if(a==='del')onRemove();
+    });return;
+  }
+  const w=document.createElement('div');w.className='viewer';
+  w.innerHTML=`<div class="vbar"><button data-x>סגירה</button><span><button data-sh>שיתוף</button> <button class="danger" data-rm>הסרה</button></span></div><div class="vimg"><img alt="" src="${url}"></div>`;
+  document.body.appendChild(w);
+  w.querySelector('[data-x]').onclick=()=>w.remove();
+  w.querySelector('[data-sh]').onclick=()=>shareBlob(blob,'תמונה.jpg');
+  w.querySelector('[data-rm]').onclick=async()=>{const ok=await ask('להסיר את התמונה מהרישום?','',[{label:'הסרה',val:true,cls:'danger'},{label:'ביטול',val:false}]);if(ok){w.remove();onRemove()}};
+}
+async function shareBlob(blob,name){
+  const f=new File([blob],name,{type:blob.type});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f]})}catch(_){}}
+  else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click()}
+}
+
+/* ---------- calendar reminder (.ics) ---------- */
+function addToCalendar(v,t){
+  const d=t.due.replace(/-/g,''),e=addD(t.due,1).replace(/-/g,''),now=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+Z$/,'Z');
+  const title=`${t.title}: ${v.name}`.replace(/[,;\\]/g,' ');
+  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//yoman-rechev//HE','CALSCALE:GREGORIAN','BEGIN:VEVENT',`UID:${uid()}@yoman-rechev`,`DTSTAMP:${now}`,
+    `DTSTART;VALUE=DATE:${d}`,`DTEND;VALUE=DATE:${e}`,`SUMMARY:${title}`,`DESCRIPTION:${(v.plate?'מספר רישוי '+fmtPlate(v.plate):'').replace(/[,;\\]/g,' ')}`,
+    'BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${title}`,'TRIGGER:-P13DT15H','END:VALARM',
+    'BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${title}`,'TRIGGER:-PT15H','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+  const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'}),url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+
+/* ---------- backup ---------- */
+const stamp=()=>{const d=new Date();return`${ds(d)}_${pad(d.getHours())}-${pad(d.getMinutes())}`};
+const b2u=b=>new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(b)});
+async function backupJSON(){
+  toast('מכין גיבוי…');
+  const docs={};
+  for(const id of new Set(S.recs.flatMap(r=>r.docs||[]))){const b=await idb.get('docs',id).catch(()=>null);if(b)docs[id]=await b2u(b)}
+  const text=JSON.stringify({app:'yoman-rechev',v:1,exported:new Date().toISOString(),vehicles:S.vehicles,recs:S.recs,docs});
+  const f=new File([text],`yoman-rechev-${stamp()}.json`,{type:'application/json'});
+  let ok=true;
+  if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f]})}catch(e){ok=e.name!=='AbortError'}}
+  else{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;a.click()}
+  if(ok){S.meta.lastBackup=Date.now();save();toast('הגיבוי נשמר')}
+}
+async function restoreJSON(file){
+  let d;try{d=JSON.parse(await file.text())}catch(e){toast('הקובץ אינו גיבוי תקין');return}
+  if(!d||d.app!=='yoman-rechev'||!Array.isArray(d.vehicles)){toast('הקובץ אינו גיבוי של יומן רכב');return}
+  const ok=await ask('לשחזר מהגיבוי?',`${d.vehicles.length} כלי רכב ו-${d.recs.length} רישומים. הנתונים הנוכחיים יוחלפו.`,[{label:'שחזור',val:true,cls:'danger'},{label:'ביטול',val:false}]);
+  if(!ok)return;
+  await idb.clear('docs');
+  for(const[id,u]of Object.entries(d.docs||{})){try{await idb.set('docs',id,await (await fetch(u)).blob())}catch(_){}}
+  S={v:1,vehicles:d.vehicles,recs:d.recs||[],meta:{lastBackup:Date.now()}};await persist();go('home');toast('הנתונים שוחזרו');
+}
+function openMenu(){
+  const lb=S.meta.lastBackup;
+  const s=sheet(`<div class="snav"><span></span><span class="ttl">הגדרות</span><button class="r" data-close>סיום</button></div>
+    <div class="group"><button class="row" data-a="backup"><span class="lbl">גיבוי</span>${CHEV}</button><button class="row" data-a="restore"><span class="lbl">שחזור מגיבוי</span>${CHEV}</button></div>
+    <div class="foot">הנתונים והתמונות נשמרים רק במכשיר הזה. ${lb?`גיבוי אחרון: ${new Date(lb).toLocaleDateString('he-IL')}.`:'עוד לא נשמר גיבוי.'} הגיבוי כולל גם את התמונות.</div>
+    <div class="gap"></div>
+    <div class="group"><button class="row" data-a="wipe"><span style="color:var(--red)">מחיקת כל הנתונים</span></button></div>`);
+  s.el.querySelector('[data-close]').onclick=s.close;
+  const act={backup:()=>{s.close();backupJSON()},restore:()=>{s.close();$('#fileJson').click()},
+    wipe:async()=>{s.close();const ok=await ask('למחוק את כל הנתונים?','כל כלי הרכב, הרישומים והתמונות יימחקו מהמכשיר.',[{label:'מחיקת הכל',val:true,cls:'danger'},{label:'ביטול',val:false}]);
+      if(!ok)return;S=fresh();await idb.clear('docs').catch(()=>{});await persist();go('home');toast('הכל נמחק')}};
+  s.el.querySelectorAll('[data-a]').forEach(b=>b.onclick=act[b.dataset.a]);
+}
+
+/* ---------- start ---------- */
+$('#addRec').onclick=async()=>{
+  if(!S.vehicles.length){editVehicle(null);return}
+  const vid=UI.view==='veh'?UI.vid:await pickVehicle();if(!vid)return;
+  const t=await ask('מה לרשום?','',[{label:'טיפול',val:'svc'},{label:'ביטוח',val:'ins'},{label:'טסט ורישיון',val:'test'},{label:'אחר',val:'other'},{label:'ביטול',val:null}]);
+  if(t)editRecord({vid,type:t});
+};
+$('#fileJson').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)restoreJSON(f)};
+$('#fileDoc').onchange=e=>{const fs=[...e.target.files];e.target.value='';if(fs.length)onDocFiles(fs)};
+(async()=>{
+  await load();render();
+  if('serviceWorker' in navigator&&location.protocol==='https:'){try{navigator.serviceWorker.register('./sw.js').catch(()=>{})}catch(_){}}
+})();
+</script>
+</body>
+</html>
