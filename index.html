@@ -197,6 +197,9 @@ const ICONS={
  chev:'<path d="M9 5l7 7-7 7"/>',
  cal:'<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
  clip:'<path d="M20 11.5l-8.3 8.3a5 5 0 0 1-7-7L13 4.5a3.3 3.3 0 0 1 4.7 4.7l-8.3 8.3a1.7 1.7 0 0 1-2.4-2.4L14.5 7.6"/>',
+ truck:'<path d="M3 6.5h11v10H3zM14 9.5h4l3 3.5v3.5h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
+ id:'<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M5.5 16c.6-1.6 1.7-2.5 3-2.5s2.4.9 3 2.5M14 10h4M14 13.5h3"/>',
+ globe:'<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5z"/>',
  gauge:'<path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l3.5-5"/>'
 };
 const svg=(n,x='')=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${x}>${ICONS[n]}</svg>`;
@@ -206,7 +209,10 @@ const CHEV=`<span class="chev">${svg('chev')}</span>`;
 const TYPES={svc:{lbl:'טיפול',icon:'wrench',color:'#2F6FDB'},ins:{lbl:'ביטוח',icon:'shield',color:'#8E5BD9'},test:{lbl:'טסט ורישיון',icon:'check',color:'#2E9E5B'},other:{lbl:'אחר',icon:'note',color:'#6E7781'}};
 const INS={mand:'ביטוח חובה',comp:'ביטוח מקיף',third:'ביטוח צד ג׳'};
 const SVC_ITEMS={car:['טיפול תקופתי','שמן ומסנן','צמיגים','בלמים','מצבר','מיזוג','מגבים','פנסים','תיקון'],moto:['טיפול תקופתי','שמן ומסנן','צמיגים','בלמים','מצבר','שרשרת וגלגלי שיניים','מצתים','תיקון']};
-const SVC_KM={car:15000,moto:6000};
+const SVC_KM={car:15000,moto:6000,other:15000};
+SVC_ITEMS.other=SVC_ITEMS.car;
+const KIND_ICON={car:'car',moto:'moto',other:'truck'};
+const PERS={dl:{title:'רישיון נהיגה',icon:'id',color:'#2F6FDB'},idp:{title:'רישיון נהיגה בינלאומי',icon:'globe',color:'#12907F'}};
 const GOV_URL='https://data.gov.il/api/3/action/datastore_search?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3';
 
 /* ---------- helpers ---------- */
@@ -239,10 +245,11 @@ const idb={db:null,
   keys(s){return this.req(s,'readonly',o=>o.getAllKeys())},
   clear(s){return this.req(s,'readwrite',o=>o.clear())}
 };
-const fresh=()=>({v:1,vehicles:[],recs:[],meta:{}});
+const fresh=()=>({v:1,vehicles:[],recs:[],personal:{},meta:{}});
 async function load(){
   try{await idb.open();S=await idb.get('kv','state')}catch(e){idb.db=null}
   if(!S||!Array.isArray(S.vehicles))S=fresh();
+  S.personal=S.personal||{};
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(_){}
   gcDocs();
 }
@@ -251,9 +258,10 @@ function save(){clearTimeout(saveT);saveT=setTimeout(persist,120)}
 async function persist(){clearTimeout(saveT);try{if(idb.db)await idb.set('kv','state',S)}catch(e){toast('השמירה נכשלה: '+e.message)}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')persist()});
 async function gcDocs(){ // remove photos no record points to (runs at launch, so undo still works during a session)
-  if(!idb.db)return;try{const used=new Set(S.recs.flatMap(r=>r.docs||[]));for(const k of await idb.keys('docs'))if(!used.has(k))await idb.del('docs',k)}catch(_){}
+  if(!idb.db)return;try{const used=new Set(allDocIds());for(const k of await idb.keys('docs'))if(!used.has(k))await idb.del('docs',k)}catch(_){}
 }
 const vById=id=>S.vehicles.find(v=>v.id===id);
+const allDocIds=()=>[...S.recs.flatMap(r=>r.docs||[]),...S.vehicles.flatMap(v=>v.licDocs||[]),...Object.values(S.personal||{}).flatMap(p=>p.docs||[])];
 
 /* ---------- due dates ---------- */
 function tracks(v){
@@ -277,10 +285,10 @@ function tracks(v){
 }
 function status(t,v){
   if(t.missing)return{st:'none',text:'לא הוזן'};
-  const days=t.due?diffD(today(),t.due):null,kl=t.dueKm&&v.km?t.dueKm-v.km:null;
+  const days=t.due?diffD(today(),t.due):null,kl=t.dueKm&&v&&v.km?t.dueKm-v.km:null;
   if(days===null&&kl===null)return{st:'none',text:'ללא מועד'};
   const over=(days!==null&&days<0)||(kl!==null&&kl<=0),soon=(days!==null&&days<=30)||(kl!==null&&kl<=1000);
-  const isExp=t.type==='ins'||t.type==='test';
+  const isExp=t.type==='ins'||t.type==='test'||t.type==='pers';
   let text;
   if(over){text=days!==null&&days<0?(isExp?`פג לפני ${-days===1?'יום':-days+' ימים'}`:`באיחור של ${-days===1?'יום':-days+' ימים'}`):`עברת את המועד ב-${km(-kl)}`}
   else{const p=[];
@@ -289,8 +297,14 @@ function status(t,v){
     text=p.join(' או ')}
   return{st:over?'over':soon?'soon':'ok',text,days,kl};
 }
+function persTracks(){
+  return Object.entries(PERS).map(([k,P])=>{const p=S.personal[k]||{};
+    const t={k:'p-'+k,type:'pers',pk:k,title:P.title,due:p.expiry||null,missing:!p.expiry&&!p.num&&!(p.docs||[]).length};
+    Object.assign(t,status(t,null));if(!t.missing&&!t.due){t.st='none';t.text='לא הוזן תאריך תוקף'}return t});
+}
 function allDue(){
   const out=[];for(const v of S.vehicles)for(const t of tracks(v))if(!t.missing&&t.st!=='none')out.push({...t,v});
+  for(const t of persTracks())if(!t.missing&&t.st!=='none')out.push({...t,v:null});
   const rank={over:0,soon:1,ok:2};
   return out.sort((a,b)=>rank[a.st]-rank[b.st]||(a.days??9e9)-(b.days??9e9));
 }
@@ -314,23 +328,33 @@ function renderHome(){
   let h=`<div class="navrow"><button class="navbtn" id="menuBtn" aria-label="תפריט">${svg('more')}</button><span class="sp"></span><button class="navbtn" id="addVeh" aria-label="הוספת רכב">${svg('plus')}</button></div><h1>יומן רכב</h1>`;
   if(!S.vehicles.length){
     h+=`<div class="group"><div class="empty"><b>עוד לא הוספת רכב</b>מוסיפים את הרכב והאופנוע, ואז רושמים ביטוחים, טסטים וטיפולים. האפליקציה תראה מה מתקרב.<button class="cta" id="firstVeh">הוספת רכב</button></div></div>`;
-    el.innerHTML=h;$('#firstVeh').onclick=()=>editVehicle(null);
+    h+=`<div class="ghdr">הרישיונות שלי</div><div class="group">${persTracks().map(t=>`<button class="row tall" data-pk="${t.pk}" style="--inset:58px"><span class="ic" style="--c:${PERS[t.pk].color}">${svg(PERS[t.pk].icon)}</span><span class="mid"><span class="t">${esc(t.title)}</span><span class="s stxt st-${t.st}">${esc(t.missing?'לא הוזן':t.text)}</span></span>${CHEV}</button>`).join('')}</div>`;
+    el.innerHTML=h;$('#firstVeh').onclick=()=>editVehicle(null);el.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>editPersonal(b.dataset.pk));
   }else{
     for(const v of S.vehicles){
       const ts=tracks(v).filter(t=>!t.missing||t.k==='ins-mand'||t.k==='test');
-      h+=`<button class="vcard" data-v="${v.id}"><span class="top"><span class="kind">${svg(v.kind==='moto'?'moto':'car')}</span><span class="mid"><span class="nm">${esc(v.name||'רכב')}</span><span class="meta">${esc([v.make,v.model,v.year].filter(Boolean).join(' '))}${v.km?(v.make||v.model?', ':'')+km(v.km):''}</span></span>${plate(v.plate,'sm')}</span>
+      h+=`<button class="vcard" data-v="${v.id}"><span class="top"><span class="kind">${svg(KIND_ICON[v.kind]||'car')}</span><span class="mid"><span class="nm">${esc(v.name||'רכב')}</span><span class="meta">${esc([v.make,v.model,v.year].filter(Boolean).join(' '))}${v.km?(v.make||v.model?', ':'')+km(v.km):''}</span></span>${plate(v.plate,'sm')}</span>
         <span class="pills">${ts.map(t=>`<span class="pill"><span class="dot st-${t.st}"></span>${esc(t.type==='svc'?'טיפול':t.title)}${t.st==='over'||t.st==='soon'||t.missing?': '+esc(t.text):''}</span>`).join('')}</span></button>`;
     }
+    h+=`<div class="group"><button class="row" id="addVeh2"><span style="color:var(--tint);display:flex;align-items:center;gap:8px">${svg('plus')} הוספת כלי רכב</span></button></div>`;
+    const pt=persTracks();
+    h+=`<div class="ghdr">הרישיונות שלי</div><div class="group">${pt.map(t=>`<button class="row tall" data-pk="${t.pk}" style="--inset:58px"><span class="ic" style="--c:${PERS[t.pk].color}">${svg(PERS[t.pk].icon)}</span><span class="mid"><span class="t">${esc(t.title)}</span><span class="s stxt st-${t.st}">${esc(t.missing?'לא הוזן':t.text)}</span></span>${(S.personal[t.pk]?.docs||[]).length?`<span class="val">${svg('clip')}</span>`:''}${CHEV}</button>`).join('')}</div>`;
     const near=due.filter(d=>d.st!=='ok'||(d.days!==null&&d.days<=90));
     h+=`<div class="ghdr">מה מחכה</div>`;
-    h+=near.length?`<div class="group">${near.map(d=>`<button class="row tall" data-due="${d.v.id}|${esc(d.k)}" style="--inset:42px"><span class="dot st-${d.st}"></span><span class="mid"><span class="t">${esc(d.title)}, ${esc(d.v.name||'')}</span><span class="s stxt st-${d.st}">${esc(d.text)}</span></span>${CHEV}</button>`).join('')}</div>`
+    h+=near.length?`<div class="group">${near.map(d=>`<button class="row tall" data-due="${d.v?d.v.id:'p'}|${esc(d.k)}" style="--inset:42px"><span class="dot st-${d.st}"></span><span class="mid"><span class="t">${esc(d.title)}${d.v?', '+esc(d.v.name||''):''}</span><span class="s stxt st-${d.st}">${esc(d.text)}</span></span>${CHEV}</button>`).join('')}</div>`
       :`<div class="group"><div class="row"><span class="dot st-ok"></span><span class="lbl">אין מועדים ב-90 הימים הקרובים</span></div></div>`;
+    if(due.some(d=>d.due&&d.due>=today()))h+=`<div class="gap" style="height:12px"></div><div class="group"><button class="row" id="calAll"><span style="color:var(--tint);display:flex;align-items:center;gap:8px">${svg('cal')} הוספת כל המועדים ליומן</span></button></div><div class="foot">טסטים, ביטוחים, טיפולים ורישיונות, עם התראה שבועיים לפני ויום לפני.</div>`;
     const tot=S.vehicles.map(v=>[v,S.recs.filter(r=>r.vid===v.id&&(recDate(r)||'').startsWith(y)).reduce((a,r)=>a+(r.cost||0),0)]);
     if(tot.some(x=>x[1]))h+=`<div class="ghdr">הוצאות ${y}</div><div class="group">${tot.map(([v,c])=>`<div class="row"><span class="lbl">${esc(v.name||'רכב')}</span><span class="num val">${money(c)}</span></div>`).join('')}
       ${tot.length>1?`<div class="row"><span class="lbl" style="font-weight:600">סה״כ</span><span class="num">${money(tot.reduce((a,x)=>a+x[1],0))}</span></div>`:''}</div>`;
     el.innerHTML=h;
     el.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>go('veh',b.dataset.v));
-    el.querySelectorAll('[data-due]').forEach(b=>b.onclick=()=>{const[vid,k]=b.dataset.due.split('|');const v=vById(vid);const t=tracks(v).find(x=>x.k===k);if(t)trackAction(v,t)});
+    el.querySelectorAll('[data-due]').forEach(b=>b.onclick=()=>{const[vid,k]=b.dataset.due.split('|');
+      if(vid==='p'){editPersonal(k.slice(2));return}
+      const v=vById(vid);const t=tracks(v).find(x=>x.k===k);if(t)trackAction(v,t)});
+    el.querySelector('#addVeh2').onclick=()=>editVehicle(null);
+    el.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>editPersonal(b.dataset.pk));
+    const ca=el.querySelector('#calAll');if(ca)ca.onclick=addAllToCalendar;
   }
   $('#menuBtn').onclick=openMenu;$('#addVeh').onclick=()=>editVehicle(null);
 }
@@ -345,9 +369,14 @@ function renderVehicle(v){
     <div class="group"><button class="row" id="kmRow"><span class="lbl">קילומטראז׳</span><span class="val">${v.km?`<span class="num">${km(v.km)}</span>`:'לא הוזן'}</span>${CHEV}</button></div>
     ${v.km&&v.kmDate?`<div class="foot">עודכן ב-${fmtD(v.kmDate)}</div>`:''}
     <div class="ghdr">מועדים</div>
-    <div class="group">${ts.map(t=>`<button class="row tall" data-t="${esc(t.k)}" style="--inset:42px"><span class="dot st-${t.st}"></span><span class="mid"><span class="t">${esc(t.title)}</span><span class="s stxt st-${t.st}">${esc(t.text)}</span></span>${CHEV}</button>`).join('')}</div>`;
+    <div class="group" id="tsGroup">${ts.map(t=>`<button class="row tall" data-t="${esc(t.k)}" style="--inset:42px"><span class="dot st-${t.st}"></span><span class="mid"><span class="t">${esc(t.title)}</span><span class="s stxt st-${t.st}">${esc(t.text)}</span></span>${CHEV}</button>`).join('')}</div>`;
+  const testT=ts.find(t=>t.k==='test'),insT=ts.filter(t=>t.type==='ins'&&!t.missing);
+  const cnt=n=>n?`<span class="val" style="display:flex;align-items:center;gap:4px">${svg('clip')}<span class="num">${n}</span></span>`:'<span class="val">הוספה</span>';
+  h+=`<div class="ghdr">מסמכים</div><div class="group">
+    <button class="row tall" id="licDocs" style="--inset:58px"><span class="ic" style="--c:#E09A00">${svg('id')}</span><span class="mid"><span class="t">רישיון רכב</span><span class="s">${testT&&testT.due?'בתוקף עד '+fmtD(testT.due):'צילום של רישיון הרכב'}</span></span>${cnt((v.licDocs||[]).length)}${CHEV}</button>
+    ${insT.map(t=>`<button class="row tall" data-insdoc="${t.rec.id}" style="--inset:58px"><span class="ic" style="--c:${TYPES.ins.color}">${svg('shield')}</span><span class="mid"><span class="t">${esc(t.title)}</span><span class="s">${esc([t.rec.company,t.rec.policy?'פוליסה '+t.rec.policy:'','עד '+fmtD(t.rec.end)].filter(Boolean).join(', '))}</span></span>${cnt((t.rec.docs||[]).length)}${CHEV}</button>`).join('')}
+  </div>`;
   if(years.length){
-    const y=years[0],o=byYear.get(y);
     h+=`<div class="ghdr">הוצאות</div><div class="group">${years.map(y=>{const o=byYear.get(y);const parts=['ins','svc','test','other'].filter(k=>o[k]).map(k=>`${k==='ins'?'ביטוח':k==='svc'?'טיפולים':k==='test'?'טסט':'אחר'} ${money(o[k])}`).join(', ');return`<div class="row tall"><span class="mid"><span class="t">${y}</span><span class="s">${esc(parts)}</span></span><span class="num">${money(o.t)}</span></div>`}).join('')}</div>`;
   }
   h+=`<div class="ghdr">היסטוריה</div>`;
@@ -359,6 +388,8 @@ function renderVehicle(v){
   $('#editV').onclick=()=>editVehicle(v);
   $('#kmRow').onclick=()=>editKm(v);
   el.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{const t=ts.find(x=>x.k===b.dataset.t);if(t)trackAction(v,t)});
+  $('#licDocs').onclick=()=>docsSheet('רישיון רכב',`צלם את רישיון הרכב של ${v.name} משני הצדדים, כדי שיהיה תמיד בטלפון.`,()=>v.licDocs,ids=>{v.licDocs=ids});
+  el.querySelectorAll('[data-insdoc]').forEach(b=>b.onclick=()=>{const r=S.recs.find(x=>x.id===b.dataset.insdoc);if(r)docsSheet(INS[r.sub],'תעודת ביטוח, פוליסה או כל מסמך אחר מחברת הביטוח.',()=>r.docs,ids=>{r.docs=ids})});
   el.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const r=S.recs.find(x=>x.id===b.dataset.r);if(r)editRecord({rec:r})});
 }
 
@@ -408,7 +439,7 @@ function editVehicle(orig){
   const v=orig?{...orig}:{id:uid(),kind:'car',name:'',make:'',model:'',year:'',color:'',plate:'',km:null,kmDate:null};
   let found=null;
   const s=sheet(`<div class="snav"><button class="l" data-close>ביטול</button><span class="ttl">${orig?'עריכת רכב':'רכב חדש'}</span><button class="r" id="vSave">שמירה</button></div>
-    <nav class="seg" id="vKind"><button data-k="car">רכב</button><button data-k="moto">אופנוע</button></nav>
+    <nav class="seg" id="vKind"><button data-k="car">רכב</button><button data-k="moto">אופנוע</button><button data-k="other">אחר</button></nav>
     <div class="gap" style="height:14px"></div>
     <div class="group">
       <div class="row"><span class="lbl">כינוי</span><input class="inp" id="vName" placeholder="למשל: האוטו" maxlength="30"></div>
@@ -452,7 +483,7 @@ function editVehicle(orig){
     v.name=f('#vName').value.trim();v.plate=f('#vPlate').value.replace(/\D/g,'');v.make=f('#vMake').value.trim();v.model=f('#vModel').value.trim();
     v.year=f('#vYear').value.replace(/\D/g,'');v.color=f('#vColor').value.trim();
     const k=num(f('#vKm').value);if(k!==(orig?orig.km:null)){v.km=k;v.kmDate=k?today():null}
-    if(!v.name)v.name=v.model||v.make||(v.kind==='moto'?'האופנוע':'האוטו');
+    if(!v.name)v.name=v.model||v.make||(v.kind==='moto'?'האופנוע':v.kind==='other'?'כלי רכב':'האוטו');
     if(orig)Object.assign(orig,v);else S.vehicles.push(v);
     if(found&&!S.recs.some(r=>r.vid===v.id&&r.type==='test'&&r.next===found.tokef))
       S.recs.push({id:uid(),vid:v.id,type:'test',date:found.last||addM(found.tokef,-12),next:found.tokef,cost:null,note:'מתוך מאגר משרד התחבורה',docs:[]});
@@ -549,17 +580,7 @@ function editRecord({rec=null,vid=null,type='svc',sub='mand',from=null}={}){
     el.querySelectorAll('[data-n]').forEach(i=>r[i.dataset.n]=num(i.value));
     el.querySelectorAll('[data-s]').forEach(i=>{if(i.tagName!=='BUTTON')r[i.dataset.s]=i.value.trim()});
   }
-  async function renderDocs(){
-    const box=el.querySelector('#fDocs');if(!box)return;
-    box.innerHTML=(r.docs||[]).map(id=>`<button class="doc" data-doc="${id}"></button>`).join('')+`<button class="doc add" id="fAddDoc" aria-label="הוספת תמונה או מסמך">${svg('plus')}</button>`;
-    box.querySelector('#fAddDoc').onclick=()=>{collect();pickDocs(ids=>{r.docs=[...(r.docs||[]),...ids];renderDocs()})};
-    for(const b of box.querySelectorAll('[data-doc]')){
-      const blob=await idb.get('docs',b.dataset.doc).catch(()=>null);
-      if(!blob){b.textContent='?';continue}
-      if(blob.type.startsWith('image/'))b.style.backgroundImage=`url(${URL.createObjectURL(blob)})`;else b.textContent='PDF';
-      b.onclick=()=>viewDoc(b.dataset.doc,blob,()=>{r.docs=r.docs.filter(x=>x!==b.dataset.doc);renderDocs()});
-    }
-  }
+  function renderDocs(){const box=el.querySelector('#fDocs');if(box)docsGrid(box,()=>r.docs,ids=>{r.docs=ids})}
   el.querySelectorAll('#rType button').forEach(b=>b.onclick=()=>{
     collect();const t=b.dataset.t;if(t===r.type)return;r.type=t;
     if(t==='ins'){r.sub=r.sub||'mand';r.start=r.start||r.date||today();r.end=r.end||addD(addM(r.start,12),-1)}
@@ -580,7 +601,10 @@ function editRecord({rec=null,vid=null,type='svc',sub='mand',from=null}={}){
     if(clean.km&&(!v.km||clean.km>v.km)){v.km=clean.km;v.kmDate=clean.date||today()}
     save();s.close();
     if(UI.view!=='veh'||UI.vid!==clean.vid)go('veh',clean.vid);else render();
-    toast(orig?'הרישום עודכן':'נשמר');
+    const tk=clean.type==='ins'?'ins-'+clean.sub:clean.type==='test'?'test':null;
+    const tt=tk&&tracks(v).find(x=>x.k===tk&&x.rec&&x.rec.id===clean.id);
+    if(tt&&tt.due&&tt.due>=today())toast(orig?'הרישום עודכן':'נשמר',{label:'תזכורת ביומן',fn:()=>addToCalendar(v,tt)});
+    else toast(orig?'הרישום עודכן':'נשמר');
   };
   form();
 }
@@ -630,16 +654,80 @@ async function shareBlob(blob,name){
 }
 
 /* ---------- calendar reminder (.ics) ---------- */
-function addToCalendar(v,t){
-  const d=t.due.replace(/-/g,''),e=addD(t.due,1).replace(/-/g,''),now=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+Z$/,'Z');
-  const title=`${t.title}: ${v.name}`.replace(/[,;\\]/g,' ');
-  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//yoman-rechev//HE','CALSCALE:GREGORIAN','BEGIN:VEVENT',`UID:${uid()}@yoman-rechev`,`DTSTAMP:${now}`,
-    `DTSTART;VALUE=DATE:${d}`,`DTEND;VALUE=DATE:${e}`,`SUMMARY:${title}`,`DESCRIPTION:${(v.plate?'מספר רישוי '+fmtPlate(v.plate):'').replace(/[,;\\]/g,' ')}`,
-    'BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${title}`,'TRIGGER:-P13DT15H','END:VALARM',
-    'BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${title}`,'TRIGGER:-PT15H','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+const icsTxt=x=>String(x||'').replace(/[,;\\]/g,' ').replace(/\n/g,' ');
+function icsEvent(title,date,desc){
+  const d=date.replace(/-/g,''),e=addD(date,1).replace(/-/g,''),now=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+Z$/,'Z');
+  return['BEGIN:VEVENT',`UID:${uid()}@yoman-rechev`,`DTSTAMP:${now}`,`DTSTART;VALUE=DATE:${d}`,`DTEND;VALUE=DATE:${e}`,`SUMMARY:${icsTxt(title)}`,`DESCRIPTION:${icsTxt(desc)}`,
+    'BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${icsTxt(title)}`,'TRIGGER:-P13DT15H','END:VALARM',
+    'BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${icsTxt(title)}`,'TRIGGER:-PT15H','END:VALARM','END:VEVENT'].join('\r\n');
+}
+function openICS(events){
+  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//yoman-rechev//HE','CALSCALE:GREGORIAN',...events,'END:VCALENDAR'].join('\r\n');
   const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'}),url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+const calTitle=(v,t)=>`${t.title}${v?': '+v.name:''}`;
+const calDesc=v=>v&&v.plate?'מספר רישוי '+fmtPlate(v.plate):'';
+function addToCalendar(v,t){if(t.due)openICS([icsEvent(calTitle(v,t),t.due,calDesc(v))])}
+function addAllToCalendar(){
+  const l=allDue().filter(d=>d.due&&d.due>=today());
+  if(!l.length){toast('אין מועדים עתידיים');return}
+  openICS(l.map(d=>icsEvent(calTitle(d.v,d),d.due,calDesc(d.v))));
+}
+
+/* ---------- personal licences ---------- */
+function editPersonal(k){
+  const P=PERS[k],orig=S.personal[k]||{},p=JSON.parse(JSON.stringify(orig));p.docs=p.docs||[];
+  const s=sheet(`<div class="snav"><button class="l" data-close>ביטול</button><span class="ttl">${P.title}</span><button class="r" id="pSave">שמירה</button></div><div id="pForm"></div>`);
+  const el=s.el;
+  const collect=()=>{el.querySelectorAll('[data-s]').forEach(i=>p[i.dataset.s]=i.value.trim())};
+  const dateRow=(key,label)=>`<label class="row"><span class="lbl">${label}</span><span class="dateval"><span>${p[key]?fmtD(p[key]):'בחירה'}</span><input type="date" data-d="${key}" value="${p[key]||''}"></span>${p[key]?`<button class="clr" data-clr="${key}" type="button">ניקוי</button>`:''}</label>`;
+  function form(){
+    const t={type:'pers',due:p.expiry||null};Object.assign(t,status(t,null));
+    el.querySelector('#pForm').innerHTML=`
+      <div class="preview" style="display:flex;justify-content:center;padding:4px 0 14px"><span class="ic" style="--c:${P.color};width:56px;height:56px"><svg class="i" viewBox="0 0 24 24" style="width:28px;height:28px">${ICONS[P.icon]}</svg></span></div>
+      <div class="group">
+        <div class="row"><span class="lbl">מספר רישיון</span><input class="inp" data-s="num" inputmode="numeric" value="${esc(p.num||'')}" maxlength="20"></div>
+        ${k==='dl'?`<div class="row"><span class="lbl">דרגות</span><input class="inp" data-s="grades" placeholder="למשל: B, A2" value="${esc(p.grades||'')}" maxlength="30"></div>`:''}
+        ${dateRow('issue','תאריך הנפקה')}
+        ${dateRow('expiry','בתוקף עד')}
+      </div>
+      ${p.expiry?`<div class="foot stxt st-${t.st}">${esc(t.text)}</div>`:''}
+      <div class="gap" style="height:14px"></div><div class="group"><div class="row"><textarea class="inp" data-s="note" placeholder="הערות" maxlength="500">${esc(p.note||'')}</textarea></div></div>
+      <div class="ghdr">צילומים</div><div class="group"><div class="docs" id="pDocs"></div></div>
+      <div class="foot">${k==='dl'?'צלם את הרישיון משני הצדדים.':'צלם את העמודים עם הפרטים והתוקף.'}</div>
+      ${p.expiry&&p.expiry>=today()?`<div class="gap"></div><div class="group"><button class="row" id="pCal"><span style="color:var(--tint);display:flex;align-items:center;gap:8px">${svg('cal')} תזכורת ביומן לחידוש</span></button></div>`:''}`;
+    el.querySelectorAll('[data-d]').forEach(i=>i.onchange=()=>{collect();p[i.dataset.d]=i.value||null;form()});
+    el.querySelectorAll('[data-clr]').forEach(b=>b.onclick=e=>{e.preventDefault();collect();p[b.dataset.clr]=null;form()});
+    docsGrid(el.querySelector('#pDocs'),()=>p.docs,ids=>{p.docs=ids});
+    const c=el.querySelector('#pCal');if(c)c.onclick=()=>openICS([icsEvent(`חידוש ${P.title}`,p.expiry,p.num?'מספר '+p.num:'')]);
+  }
+  form();
+  el.querySelector('[data-close]').onclick=s.close;
+  el.querySelector('#pSave').onclick=()=>{collect();S.personal[k]=p;save();s.close();render();toast('נשמר')};
+}
+
+/* ---------- docs grid & sheet ---------- */
+function docsGrid(box,getIds,setIds){
+  const paint=async()=>{
+    const ids=getIds()||[];
+    box.innerHTML=ids.map(id=>`<button class="doc" data-doc="${id}"></button>`).join('')+`<button class="doc add" aria-label="הוספת תמונה או מסמך">${svg('plus')}</button>`;
+    box.querySelector('.add').onclick=()=>pickDocs(n=>{setIds([...(getIds()||[]),...n]);paint()});
+    for(const b of box.querySelectorAll('[data-doc]')){
+      const id=b.dataset.doc,blob=await idb.get('docs',id).catch(()=>null);
+      if(!blob){b.textContent='?';continue}
+      if(blob.type.startsWith('image/'))b.style.backgroundImage=`url(${URL.createObjectURL(blob)})`;else b.textContent='PDF';
+      b.onclick=()=>viewDoc(id,blob,()=>{setIds((getIds()||[]).filter(x=>x!==id));paint()});
+    }
+  };
+  paint();
+}
+function docsSheet(title,foot,getIds,setIds){
+  const s=sheet(`<div class="snav"><span></span><span class="ttl">${esc(title)}</span><button class="r" data-close>סיום</button></div><div class="group"><div class="docs" id="dsBox"></div></div>${foot?`<div class="foot">${esc(foot)}</div>`:''}`);
+  s.el.querySelector('[data-close]').onclick=s.close;
+  docsGrid(s.el.querySelector('#dsBox'),getIds,ids=>{setIds(ids);save()});
+  s.onclose=()=>render();
 }
 
 /* ---------- backup ---------- */
@@ -648,8 +736,8 @@ const b2u=b=>new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.resul
 async function backupJSON(){
   toast('מכין גיבוי…');
   const docs={};
-  for(const id of new Set(S.recs.flatMap(r=>r.docs||[]))){const b=await idb.get('docs',id).catch(()=>null);if(b)docs[id]=await b2u(b)}
-  const text=JSON.stringify({app:'yoman-rechev',v:1,exported:new Date().toISOString(),vehicles:S.vehicles,recs:S.recs,docs});
+  for(const id of new Set(allDocIds())){const b=await idb.get('docs',id).catch(()=>null);if(b)docs[id]=await b2u(b)}
+  const text=JSON.stringify({app:'yoman-rechev',v:1,exported:new Date().toISOString(),vehicles:S.vehicles,recs:S.recs,personal:S.personal||{},docs});
   const f=new File([text],`yoman-rechev-${stamp()}.json`,{type:'application/json'});
   let ok=true;
   if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f]})}catch(e){ok=e.name!=='AbortError'}}
@@ -663,7 +751,7 @@ async function restoreJSON(file){
   if(!ok)return;
   await idb.clear('docs');
   for(const[id,u]of Object.entries(d.docs||{})){try{await idb.set('docs',id,await (await fetch(u)).blob())}catch(_){}}
-  S={v:1,vehicles:d.vehicles,recs:d.recs||[],meta:{lastBackup:Date.now()}};await persist();go('home');toast('הנתונים שוחזרו');
+  S={v:1,vehicles:d.vehicles,recs:d.recs||[],personal:d.personal||{},meta:{lastBackup:Date.now()}};await persist();go('home');toast('הנתונים שוחזרו');
 }
 function openMenu(){
   const lb=S.meta.lastBackup;
