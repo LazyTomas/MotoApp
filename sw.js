@@ -1,5 +1,5 @@
 // יומן רכב – service worker: keeps the app working offline.
-const V = 'yoman-rechev-v2';
+const V = 'yoman-rechev-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

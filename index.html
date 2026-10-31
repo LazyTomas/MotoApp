@@ -213,7 +213,25 @@ const SVC_KM={car:15000,moto:6000,other:15000};
 SVC_ITEMS.other=SVC_ITEMS.car;
 const KIND_ICON={car:'car',moto:'moto',other:'truck'};
 const PERS={dl:{title:'רישיון נהיגה',icon:'id',color:'#2F6FDB'},idp:{title:'רישיון נהיגה בינלאומי',icon:'globe',color:'#12907F'}};
-const GOV_URL='https://data.gov.il/api/3/action/datastore_search?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3';
+const GOV_API='https://data.gov.il/api/3/action/datastore_search';
+const GOV_RES=[['053cea08-09bc-40ec-8f7a-156f0677aff3','רכב פרטי ומסחרי'],['bf9df4e2-d90d-4c0a-a400-19e15af8e95f','דו-גלגלי']];
+// tries each registry, first with an exact numeric filter, then with a text search; returns {rec,src} or {err}
+async function govLookup(plate){
+  const n=+plate;let lastErr=null,reached=false;
+  for(const[rid,src]of GOV_RES){
+    for(const qs of[`filters=${encodeURIComponent(JSON.stringify({mispar_rechev:n}))}`,`q=${encodeURIComponent(plate)}`]){
+      try{
+        const r=await fetch(`${GOV_API}?resource_id=${rid}&${qs}&limit=5`,{cache:'no-store'});
+        if(!r.ok){lastErr=`שגיאה ${r.status} מהשרת`;continue}
+        const j=await r.json();reached=true;
+        if(!j.success){lastErr=(j.error&&(j.error.message||j.error.__type))||'המאגר החזיר שגיאה';continue}
+        const rec=(j.result.records||[]).find(x=>+x.mispar_rechev===n||String(x.mispar_rechev).replace(/\D/g,'')===plate);
+        if(rec)return{rec,src};
+      }catch(e){lastErr=e&&e.message||'אין חיבור'}
+    }
+  }
+  return reached&&!lastErr?{none:true}:{err:lastErr||'לא נמצא',reached};
+}
 
 /* ---------- helpers ---------- */
 const $=s=>document.querySelector(s);
@@ -464,19 +482,20 @@ function editVehicle(orig){
   f('#vLook').onclick=async()=>{
     const p=f('#vPlate').value.replace(/\D/g,'');if(p.length<5){f('#vPlate').focus();return}
     const b=f('#vLook'),msg=f('#vLookMsg');b.disabled=true;b.textContent='מחפש…';
-    try{
-      const r=await fetch(`${GOV_URL}&filters=${encodeURIComponent(JSON.stringify({mispar_rechev:+p}))}&limit=1`);
-      const j=await r.json();const x=j&&j.result&&j.result.records&&j.result.records[0];
-      if(!x){msg.textContent=v.kind==='moto'?'המספר לא נמצא במאגר. המאגר הזה כולל רכב פרטי ומסחרי, ולכן אופנועים ממלאים ידנית.':'המספר לא נמצא במאגר. אפשר למלא את הפרטים ידנית.'}
-      else{
-        const cl=s=>String(s??'').trim();
-        f('#vMake').value=cl(x.tozeret_nm);f('#vModel').value=cl(x.kinuy_mishari||x.degem_nm);f('#vYear').value=cl(x.shnat_yitzur);f('#vColor').value=cl(x.tzeva_rechev);
-        if(!f('#vName').value)f('#vName').value=cl(x.kinuy_mishari)||cl(x.tozeret_nm);
-        const tk=cl(x.tokef_dt).slice(0,10),last=cl(x.mivchan_acharon_dt).slice(0,10);
-        found=/^\d{4}-\d\d-\d\d$/.test(tk)?{tokef:tk,last:/^\d{4}-\d\d-\d\d$/.test(last)?last:null}:null;
-        msg.textContent=found?`נמצא. תוקף הרישיון עד ${fmtD(found.tokef)}. הוא יירשם אוטומטית כמועד הטסט הבא.`:'נמצא, והפרטים מולאו.';
-      }
-    }catch(e){msg.textContent='לא הצלחתי להתחבר למאגר. בדוק את החיבור לאינטרנט, או מלא את הפרטים ידנית.'}
+    const res=await govLookup(p);
+    if(res.rec){
+      const x=res.rec,cl=s=>String(s??'').trim();
+      f('#vMake').value=cl(x.tozeret_nm);f('#vModel').value=cl(x.kinuy_mishari||x.degem_nm);f('#vYear').value=cl(x.shnat_yitzur);f('#vColor').value=cl(x.tzeva_rechev);
+      if(!f('#vName').value)f('#vName').value=cl(x.kinuy_mishari)||cl(x.tozeret_nm);
+      if(res.src==='דו-גלגלי'&&v.kind!=='moto'){v.kind='moto';paintKind()}
+      const tk=cl(x.tokef_dt).slice(0,10),last=cl(x.mivchan_acharon_dt).slice(0,10);
+      found=/^\d{4}-\d\d-\d\d$/.test(tk)?{tokef:tk,last:/^\d{4}-\d\d-\d\d$/.test(last)?last:null}:null;
+      msg.textContent=`נמצא במאגר ${res.src}.`+(found?` תוקף הרישיון עד ${fmtD(found.tokef)}, והוא יירשם כמועד הטסט הבא.`:'');
+    }else if(res.none){
+      msg.textContent=`המספר ${fmtPlate(p)} לא נמצא במאגרי רכב פרטי ומסחרי ודו-גלגלי. בדוק את הספרות, או מלא את הפרטים ידנית.`;
+    }else{
+      msg.textContent=`לא הצלחתי לקבל תשובה מהמאגר (${res.err}). ${res.reached?'':'בדוק את החיבור לאינטרנט, או '}אפשר למלא את הפרטים ידנית.`;
+    }
     b.disabled=false;b.textContent='מילוי פרטים';
   };
   f('#vSave').onclick=()=>{
